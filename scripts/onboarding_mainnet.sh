@@ -11,9 +11,9 @@ GRAFANA="https://raw.githubusercontent.com/Entropy-Foundation/supra-node-monitor
 GRAFANA_CENTOS="https://raw.githubusercontent.com/Entropy-Foundation/supra-node-monitoring-tool/master/nodeops-monitoring-telegraf-centos.sh"
 
 create_folder_and_files() {
-    touch operator_config_mainnet.toml
-    if [ ! -d "supra_configs_mainnet" ]; then
-        mkdir supra_configs_mainnet
+    touch $CONFIG_FILE
+    if [ ! -d "$SCRIPT_EXECUTION_LOCATION" ]; then
+        mkdir $SCRIPT_EXECUTION_LOCATION
     else
         echo ""
     fi
@@ -31,7 +31,8 @@ display_questions() {
     echo "4. Select Phase IV - Start the node and other services"
     echo "5. Select Phase V - Restart the network using snapshot"
     echo "6. Select phase VI - Update the binaries of network"
-    echo "7. Exit"
+    echo "7. Setup Grafana"
+    echo "8. Exit"
 }
 
 check_permissions() {
@@ -52,7 +53,7 @@ check_prerequisites() {
     if ! command -v docker &>/dev/null; then
         echo "Docker is not installed. Please install Docker before proceeding."
         echo "Terminating Script"
-        echo " "
+        echo ""
         exit 1
     fi 
 
@@ -72,25 +73,28 @@ check_prerequisites() {
     # Check if toml-cli is installed
     if ! command -v toml &> /dev/null; then
         echo "toml-cli could not be found. Please install it to proceed."
-        echo "command : cargo install toml-cli"
+        echo "Command : cargo install toml-cli"
         exit 1
     fi 
 
     # Check if sha256sum is installed
     if ! command -v sha256sum &> /dev/null; then
         echo "sha256sum is not installed."
+        echo "Command : sudo apt install coreutils"
         exit 1
     fi
 
     # Check if openssl is installed
     if ! command -v openssl &> /dev/null; then
         echo "openssl is not installed."
+        echo "Command : sudo apt install openssl"
         exit 1
     fi
 
     # Check if zip is installed
     if ! command -v zip &> /dev/null; then
         echo "zip is not installed, please install zip manually."
+        echo "Command : sudo apt install zip"
         exit 1
     fi
 
@@ -905,7 +909,7 @@ zip_and_clean_phase_3_files() {
     fi
 
     zip -r "$ZIP_FILE" "$BLOB_FILE"
-    sudo rm -rf "$FILE_TO_REMOVE_1" "$FILE_TO_REMOVE_2" "$FILE_TO_REMOVE_3"
+    rm -rf "$FILE_TO_REMOVE_1" "$FILE_TO_REMOVE_2" "$FILE_TO_REMOVE_3"
 
   fi
 }
@@ -976,8 +980,6 @@ echo "Starting supra container"
         echo "Failed starting the Validator node container"
         exit 1
     else
-        rm "$SCRIPT_EXECUTION_LOCATION/genesis_blob.zip"
-        rm -rf "$SCRIPT_EXECUTION_LOCATION/genesis_blob"
         echo "Started the Validator Node container."
     fi
 }
@@ -1039,34 +1041,24 @@ rm -rf $SCRIPT_EXECUTION_LOCATION/ledger_storage $SCRIPT_EXECUTION_LOCATION/smr_
 
 # Download snapshot 
 echo "Downloading the latest snapshot......"
-wget -O $SCRIPT_EXECUTION_LOCATION/latest_snapshot.zip https://testnet-snapshot.supra.com/snapshots/latest_snapshot.zip
+wget -O $SCRIPT_EXECUTION_LOCATION/latest_snapshot.zip https://mainnet-data.supra.com/snapshots/latest_snapshot.zip
 
 # Unzip snapshot 
 unzip $SCRIPT_EXECUTION_LOCATION/latest_snapshot.zip -d $SCRIPT_EXECUTION_LOCATION/
 
+mkdir -p $SCRIPT_EXECUTION_LOCATION/smr_storage/
+
 # Copy snapshot into smr_database
 cp $SCRIPT_EXECUTION_LOCATION/snapshot/snapshot_*/store/* $SCRIPT_EXECUTION_LOCATION/smr_storage/
-wget -O $SCRIPT_EXECUTION_LOCATION/genesis_blob.zip https://testnet-snapshot.supra.com/configs/genesis_blob.zip
-unzip $SCRIPT_EXECUTION_LOCATION/genesis_blob.zip -d $SCRIPT_EXECUTION_LOCATION/
-cp $SCRIPT_EXECUTION_LOCATION/genesis_blob/genesis.blob $SCRIPT_EXECUTION_LOCATION/
 }
 
 phase3_fresh_start() {
 
-    config_file="$1"
-    working_directory="$2"
-
-    ip_address=$(parse_toml "ip_address" "$config_file")
-    encoded_pswd=$(parse_toml "password" "$config_file")
     echo "Phase 3 fresh start"
-   
-    validRepo=$(getValidRepoLink)
-    echo "You provided a valid GitHub repo link: $validRepo"
-    docker exec -it supra_mainnet_$ip_address /supra/supra genesis refresh-repo "$validRepo"
-   
-    echo "Generate Genesis Blob"
+      
+    echo "Download Genesis Blob"
     echo ""
-    docker exec -it supra_mainnet_$ip_address /supra/supra genesis generate-genesis-blob
+    wget -O $SCRIPT_EXECUTION_LOCATION/genesis.blob https://mainnet-data.supra.com/configs/genesis.blob
     echo "_________________________________________________________________________________________________________________"
     echo ""
     echo "                                         ✔ Phase 3: Completed                                                    "
@@ -1284,7 +1276,9 @@ while true; do
         3)
             echo ""
             IP_ADDRESS=$(extract_ip "operator_config_mainnet.toml") 
+            dns_name=$(parse_toml "address.Dns.name" "$SCRIPT_EXECUTION_LOCATION/validator_public_identity.toml")
             setup_file_name
+            echo "File NAME is set to : $FILE_NAME"
             CONFIG_FILE="$BASE_PATH/operator_config_mainnet.toml"
             enc_password=$(grep '^password' "$CONFIG_FILE" | awk -F' = ' '{print $2}' | tr -d '"')
             decoded_password=$(echo "$enc_password" | openssl base64 -d -A)
@@ -1350,7 +1344,7 @@ while true; do
                     zip_and_clean_phase_3_files "$SCRIPT_EXECUTION_LOCATION/genesis.blob"
                     echo ""
                     echo ""
-                    phase3_fresh_start $CONFIG_FILE $SCRIPT_EXECUTION_LOCATION
+                    phase3_fresh_start
                     echo " "
                 else
                     echo "PHASE 3: Override Skipped"
@@ -1362,7 +1356,7 @@ while true; do
 
             else
                 echo "Genesis file is not present"
-                phase3_fresh_start $CONFIG_FILE $SCRIPT_EXECUTION_LOCATION
+                phase3_fresh_start
             fi
 
             ;;
@@ -1372,7 +1366,6 @@ while true; do
             CONFIG_FILE="$BASE_PATH/operator_config_mainnet.toml"
             enc_password=$(grep '^password' "$CONFIG_FILE" | awk -F' = ' '{print $2}' | tr -d '"')
             decoded_password=$(echo "$enc_password" | openssl base64 -d -A)
-            grafana_options
             echo "Starting the Node"
             start_supra_node "$decoded_password" "$IP_ADDRESS"
             ;;
@@ -1393,12 +1386,20 @@ while true; do
                 break
             done
             ;;
+            
         7)
+            echo "Setup Grafana"
+            while true; do
+                grafana_options
+                break
+            done
+            ;;
+        8)
             echo "Exit the script"
             exit 0
             ;;
         *)
-            echo "Invalid choice. Please enter a number between 1 and 5."
+            echo "Invalid choice. Please enter a number between 1 and 7."
             ;;
 
     esac
