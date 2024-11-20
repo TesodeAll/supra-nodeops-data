@@ -12,13 +12,19 @@ if [ -f "$(pwd)/onboarding_mainnet.sh" ]; then
     rm "$(pwd)/onboarding_mainnet.sh"
 fi
 
+if [ -f "$(pwd)/update_version_mainnet_2.sh" ]; then
+    echo "Remove old update_version_mainnet_2.sh script"
+    rm "$(pwd)/update_version_mainnet_2.sh"
+fi
+
+
 # Check if ip_address is set
 if [ -z "$ip_address" ]; then
     echo "IP address not found in config file."
     exit 1
 fi
 
-rm -rf $SCRIPT_EXECUTION_LOCATION/*.sig $SCRIPT_EXECUTION_LOCATION/hashmap_phase_1_previous.toml.bak $SCRIPT_EXECUTION_LOCATION/Hashmap_phase_1_latest.toml $SCRIPT_EXECUTION_LOCATION/hashmap_phase_2_latest.toml $SCRIPT_EXECUTION_LOCATION/smr_storage $SCRIPT_EXECUTION_LOCATION/hashmap_phase_2_previous.toml $SCRIPT_EXECUTION_LOCATION/supra_committees.json $SCRIPT_EXECUTION_LOCATION/extracted $SCRIPT_EXECUTION_LOCATION/supra_history $SCRIPT_EXECUTION_LOCATION/genesis.blob $SCRIPT_EXECUTION_LOCATION/ledger_storage $SCRIPT_EXECUTION_LOCATION/supra_node_logs $SCRIPT_EXECUTION_LOCATION/genesis_configs.json $SCRIPT_EXECUTION_LOCATION/latest_validator_info.json
+rm -rf $SCRIPT_EXECUTION_LOCATION/*.sig $SCRIPT_EXECUTION_LOCATION/genesis_config_arbitrary_data.json $SCRIPT_EXECUTION_LOCATION/hashmap_phase_1_previous.toml.bak $SCRIPT_EXECUTION_LOCATION/Hashmap_phase_1_latest.toml $SCRIPT_EXECUTION_LOCATION/hashmap_phase_2_latest.toml $SCRIPT_EXECUTION_LOCATION/smr_storage $SCRIPT_EXECUTION_LOCATION/hashmap_phase_2_previous.toml $SCRIPT_EXECUTION_LOCATION/supra_committees.json $SCRIPT_EXECUTION_LOCATION/extracted $SCRIPT_EXECUTION_LOCATION/supra_history $SCRIPT_EXECUTION_LOCATION/genesis.blob $SCRIPT_EXECUTION_LOCATION/ledger_storage $SCRIPT_EXECUTION_LOCATION/supra_node_logs $SCRIPT_EXECUTION_LOCATION/genesis_configs.json $SCRIPT_EXECUTION_LOCATION/latest_validator_info.json
 
 # Stop the Docker container if it's running
 echo "Stopping supra container"
@@ -36,7 +42,7 @@ echo "Supra container removed"
 
 # Remove the old Docker image
 echo "Deleting old docker images"
-if ! docker rmi asia-docker.pkg.dev/supra-devnet-misc/supra-mainnet/validator-node:v7.0.0; then
+if ! docker rmi asia-docker.pkg.dev/supra-devnet-misc/supra-mainnet/validator-node:v7.1.4; then
     echo "Failed to delete old Docker image. Exiting..."
 fi
 echo "Deleted the old Docker images"
@@ -48,7 +54,7 @@ rm ${smr_settings_file}
 wget -O $SCRIPT_EXECUTION_LOCATION/smr_settings.toml https://mainnet-data.supra.com/configs/smr_settings.toml
 wget -O $SCRIPT_EXECUTION_LOCATION/genesis_configs.json https://mainnet-data.supra.com/configs/genesis_configs.json
 wget -O $SCRIPT_EXECUTION_LOCATION/supra_committees.json https://mainnet-data.supra.com/configs/supra_committees.json
-
+wget -O $SCRIPT_EXECUTION_LOCATION/genesis_config_arbitrary_data.json https://mainnet-data.supra.com/configs/genesis_config_arbitrary_data.json
 # Run the Docker container
 echo "Running new docker image"
 USER_ID=$(id -u)
@@ -63,7 +69,7 @@ if !     docker run --name "supra_mainnet_$ip_address" \
         -e "SUPRA_MAX_UNCOMPRESSED_LOGS=5" \
         -e "SUPRA_MAX_LOG_FILES=20" \
         --net=host \
-        -itd asia-docker.pkg.dev/supra-devnet-misc/supra-mainnet/validator-node:v7.1.4; then
+        -itd asia-docker.pkg.dev/supra-devnet-misc/supra-mainnet/validator-node:v7.1.7; then
     echo "Failed to run new Docker image. Exiting..."
     exit 1
 fi
